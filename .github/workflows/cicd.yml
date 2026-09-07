@@ -6,7 +6,6 @@ on:
     branches: ["main"]
 
 jobs:
-
   compile:
     runs-on: ubuntu-latest
 
@@ -26,7 +25,6 @@ jobs:
 
       - name: Build with Maven
         run: mvn compile
-
 
   security-check:
     runs-on: ubuntu-latest
@@ -79,7 +77,6 @@ jobs:
             --source . \
             --report-format json \
             --report-path gitleaks-report.json
-
   # test:
   #   runs-on: self-hosted
   #   needs: security-check
