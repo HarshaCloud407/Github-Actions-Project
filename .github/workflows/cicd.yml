@@ -149,7 +149,7 @@ jobs:
       # Build Project
       # --------------------------------------------------------
       - name: Build Project
-        run: mvn package
+        run: mvn package 
 
       # --------------------------------------------------------
       # Upload JAR Artifact
