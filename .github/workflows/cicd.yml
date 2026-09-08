@@ -198,19 +198,19 @@ jobs:
       # --------------------------------------------------------
       # Verify Docker Hub Secrets
       # --------------------------------------------------------
-      - name: Verify Docker Hub Secrets
-        run: |
-          if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
-            echo "ERROR: DOCKERHUB_USERNAME is EMPTY"
-            exit 1
-          fi
+      # - name: Verify Docker Hub Secrets
+      #   run: |
+      #     if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
+      #       echo "ERROR: DOCKERHUB_USERNAME is EMPTY"
+      #       exit 1
+      #     fi
 
-          if [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
-            echo "ERROR: DOCKERHUB_TOKEN is EMPTY"
-            exit 1
-          fi
+      #     if [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+      #       echo "ERROR: DOCKERHUB_TOKEN is EMPTY"
+      #       exit 1
+      #     fi
 
-          echo "Docker Hub credentials are configured"
+      #     echo "Docker Hub credentials are configured"
 
       # --------------------------------------------------------
       # Login to Docker Hub
