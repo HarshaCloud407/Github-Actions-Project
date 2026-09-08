@@ -1,7 +1,7 @@
 name: CICD Pipeline
 
 on:
-  push: 
+  push:
     branches: ["main"]
 
 jobs:
@@ -149,7 +149,7 @@ jobs:
       # Build Project
       # --------------------------------------------------------
       - name: Build Project
-        run: mvn package 
+        run: mvn package
 
       # --------------------------------------------------------
       # Upload JAR Artifact
@@ -159,93 +159,128 @@ jobs:
         with:
           name: app-jar
           path: target/*.jar
-          
+
+
   # ============================================================
-# DOCKER BUILD AND PUSH
-# ============================================================
-build_docker_image_and_push:
-  runs-on: self-hosted
-  needs: build_project_and_sonar_scan
+  # DOCKER BUILD AND PUSH
+  # ============================================================
+  build_docker_image_and_push:
+    runs-on: self-hosted
+    needs: build_project_and_sonar_scan
 
-  steps:
+    steps:
 
-    - name: Checkout Code
-      uses: actions/checkout@v5
+      # --------------------------------------------------------
+      # Checkout Code
+      # --------------------------------------------------------
+      - name: Checkout Code
+        uses: actions/checkout@v5
 
-    - name: Download JAR artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: app-jar
-        path: app
+      # --------------------------------------------------------
+      # Download JAR Artifact
+      # --------------------------------------------------------
+      - name: Download JAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-jar
+          path: app
 
-    - name: Verify Docker
-      run: |
-        whoami
-        which docker
-        docker --version
-        docker ps
+      # --------------------------------------------------------
+      # Verify Docker
+      # --------------------------------------------------------
+      - name: Verify Docker
+        run: |
+          whoami
+          which docker
+          docker --version
+          docker ps
 
-    - name: Verify Docker Hub Secrets
-      run: |
-        if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
-          echo "ERROR: DOCKERHUB_USERNAME is EMPTY"
-          exit 1
-        fi
+      # --------------------------------------------------------
+      # Verify Docker Hub Secrets
+      # --------------------------------------------------------
+      - name: Verify Docker Hub Secrets
+        run: |
+          if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
+            echo "ERROR: DOCKERHUB_USERNAME is EMPTY"
+            exit 1
+          fi
 
-        if [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
-          echo "ERROR: DOCKERHUB_TOKEN is EMPTY"
-          exit 1
-        fi
+          if [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
+            echo "ERROR: DOCKERHUB_TOKEN is EMPTY"
+            exit 1
+          fi
 
-        echo "Docker Hub credentials are configured"
+          echo "Docker Hub credentials are configured"
 
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_PASSWD }}
+      # --------------------------------------------------------
+      # Login to Docker Hub
+      # --------------------------------------------------------
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3 
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
+      # --------------------------------------------------------
+      # Set up QEMU
+      # --------------------------------------------------------
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      # --------------------------------------------------------
+      # Set up Docker Buildx
+      # --------------------------------------------------------
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Build and Push Docker Image
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        file: ./Dockerfile
-        push: true
-        tags: hariprasad123456/bankapp:latest
+      # --------------------------------------------------------
+      # Build and Push Docker Image
+      # --------------------------------------------------------
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: hariprasad123456/bankapp:latest
 
+
+  # ============================================================
+  # DEPLOY TO KUBERNETES
+  # ============================================================
   # deploy_to_kubernetes:
   #   runs-on: self-hosted
-  #   needs: buils_docker_image_and_push
+  #   needs: build_docker_image_and_push
+
   #   steps:
-  #   - name: Checkout Code
-  #     uses: actions/checkout@v4
-  #   - name: Install AWS CLI
-  #     run: |
-  #       curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-  #       unzip awscliv2.zip
-  #       sudo ./aws/install
-  #   - name: Configure AWS credentials
-  #     uses: aws-actions/configure-aws-credentials@v2
-  #     with:
-  #       aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #       aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  #       aws-region: ap-south-1
-  #   - name: Set up kubectl
-  #     uses: azure/setup-kubectl@v3
-  #     with:
-  #       version: latest
-  #   - name: Configure kubeconfig
-  #     run: |
-  #       mkdir -p $HOME/.kube
-  #       echo "${{ secrets.EKS_KUBECONFIG }}" > $HOME/.kube/config
-  #   - name: Deploy to EKS
-  #     run: |
-  #       kubectl apply -f ds.yml
+  #     - name: Checkout Code
+  #       uses: actions/checkout@v5
+
+  #     - name: Install AWS CLI
+  #       run: |
+  #         curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+  #         unzip awscliv2.zip
+  #         sudo ./aws/install
+
+  #     - name: Configure AWS credentials
+  #       uses: aws-actions/configure-aws-credentials@v2
+  #       with:
+  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #         aws-region: ap-south-1
+
+  #     - name: Set up kubectl
+  #       uses: azure/setup-kubectl@v3
+  #       with:
+  #         version: latest
+
+  #     - name: Configure kubeconfig
+  #       run: |
+  #         mkdir -p $HOME/.kube
+  #         echo "${{ secrets.EKS_KUBECONFIG }}" > $HOME/.kube/config
+
+  #     - name: Deploy to EKS
+  #       run: |
+  #         kubectl apply -f ds.yml
 
   
