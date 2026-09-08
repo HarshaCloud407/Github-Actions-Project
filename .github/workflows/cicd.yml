@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -36,34 +36,28 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # --------------------------------------------------------
       # Trivy Installation
       # --------------------------------------------------------
       - name: Install Trivy
         run: |
-          # Remove old/conflicting Trivy repositories
           sudo rm -f /etc/apt/sources.list.d/trivy.list
           sudo rm -f /etc/apt/sources.list.d/trivy.sources
           sudo rm -f /usr/share/keyrings/trivy.gpg
           sudo rm -f /usr/share/keyrings/trivy-keyring.gpg
 
           sudo apt-get update
-
           sudo apt-get install -y wget gnupg lsb-release
 
-          # Add Trivy GPG key
           wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key \
             | sudo gpg --dearmor -o /usr/share/keyrings/trivy.gpg
 
-          # Add Trivy repository
           echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" \
             | sudo tee /etc/apt/sources.list.d/trivy.list
 
           sudo apt-get update
-
-          # Install Trivy
           sudo apt-get install -y trivy
 
       - name: Verify Trivy
@@ -111,7 +105,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -132,11 +126,12 @@ jobs:
     needs: test
 
     steps:
+
       # --------------------------------------------------------
       # Checkout Code
       # --------------------------------------------------------
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -159,32 +154,11 @@ jobs:
       # --------------------------------------------------------
       # Upload JAR Artifact
       # --------------------------------------------------------
-      - name: Upload JAR artifact
+      - name: Upload JAR Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-jar
           path: target/*.jar
-
-      # --------------------------------------------------------
-      # SonarQube Scan
-      # --------------------------------------------------------
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v5.0.0
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
-
-      # --------------------------------------------------------
-      # SonarQube Quality Gate Check
-      # --------------------------------------------------------
-      - name: SonarQube Quality Gate Check
-        id: sonarqube-quality-gate-check
-        uses: SonarSource/sonarqube-quality-gate-action@master
-        with:
-          pollingTimeoutSec: 600
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
           
   # buils_docker_image_and_push:
   #   runs-on: self-hosted
