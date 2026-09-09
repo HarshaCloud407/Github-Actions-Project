@@ -2,9 +2,9 @@ name: CICD Pipeline
 
 on:
   push:
-    branches: ["main"] 
+    branches: ["main"]
 
-jobs: 
+jobs:
 
   # ============================================================
   # COMPILE
@@ -22,6 +22,11 @@ jobs:
           java-version: "17"
           distribution: "temurin"
           cache: maven
+
+      - name: Verify Java and Maven
+        run: |
+          java -version
+          mvn -version
 
       - name: Build with Maven
         run: mvn compile
@@ -43,22 +48,26 @@ jobs:
       # --------------------------------------------------------
       - name: Install Trivy
         run: |
-          sudo rm -f /etc/apt/sources.list.d/trivy.list
-          sudo rm -f /etc/apt/sources.list.d/trivy.sources
-          sudo rm -f /usr/share/keyrings/trivy.gpg
-          sudo rm -f /usr/share/keyrings/trivy-keyring.gpg
+          if command -v trivy >/dev/null 2>&1; then
+            echo "Trivy is already installed"
+          else
+            sudo rm -f /etc/apt/sources.list.d/trivy.list
+            sudo rm -f /etc/apt/sources.list.d/trivy.sources
+            sudo rm -f /usr/share/keyrings/trivy.gpg
+            sudo rm -f /usr/share/keyrings/trivy-keyring.gpg
 
-          sudo apt-get update
-          sudo apt-get install -y wget gnupg lsb-release
+            sudo apt-get update
+            sudo apt-get install -y wget gnupg lsb-release
 
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key \
-            | sudo gpg --dearmor -o /usr/share/keyrings/trivy.gpg
+            wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key \
+              | sudo gpg --dearmor -o /usr/share/keyrings/trivy.gpg
 
-          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" \
-            | sudo tee /etc/apt/sources.list.d/trivy.list
+            echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" \
+              | sudo tee /etc/apt/sources.list.d/trivy.list
 
-          sudo apt-get update
-          sudo apt-get install -y trivy
+            sudo apt-get update
+            sudo apt-get install -y trivy
+          fi
 
       - name: Verify Trivy
         run: trivy --version
@@ -79,8 +88,12 @@ jobs:
       # --------------------------------------------------------
       - name: Install Gitleaks
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gitleaks
+          if command -v gitleaks >/dev/null 2>&1; then
+            echo "Gitleaks is already installed"
+          else
+            sudo apt-get update
+            sudo apt-get install -y gitleaks
+          fi
 
       - name: Verify Gitleaks
         run: gitleaks version
@@ -119,7 +132,7 @@ jobs:
 
 
   # ============================================================
-  # BUILD + SONARQUBE
+  # BUILD PROJECT
   # ============================================================
   build_project_and_sonar_scan:
     runs-on: self-hosted
@@ -179,7 +192,7 @@ jobs:
       # --------------------------------------------------------
       # Download JAR Artifact
       # --------------------------------------------------------
-      - name: Download JAR artifact
+      - name: Download JAR Artifact
         uses: actions/download-artifact@v4
         with:
           name: app-jar
@@ -194,23 +207,6 @@ jobs:
           which docker
           docker --version
           docker ps
-
-      # --------------------------------------------------------
-      # Verify Docker Hub Secrets
-      # --------------------------------------------------------
-      # - name: Verify Docker Hub Secrets
-      #   run: |
-      #     if [ -z "${{ secrets.DOCKERHUB_USERNAME }}" ]; then
-      #       echo "ERROR: DOCKERHUB_USERNAME is EMPTY"
-      #       exit 1
-      #     fi
-
-      #     if [ -z "${{ secrets.DOCKERHUB_TOKEN }}" ]; then
-      #       echo "ERROR: DOCKERHUB_TOKEN is EMPTY"
-      #       exit 1
-      #     fi
-
-      #     echo "Docker Hub credentials are configured"
 
       # --------------------------------------------------------
       # Login to Docker Hub
@@ -246,39 +242,95 @@ jobs:
 
 
   # ============================================================
-  # DEPLOY TO KUBERNETES
+  # DEPLOY TO KUBERNETES / EKS
   # ============================================================
   deploy_to_kubernetes:
     runs-on: self-hosted
     needs: build_docker_image_and_push
 
     steps:
+
+      # --------------------------------------------------------
+      # Checkout Code
+      # --------------------------------------------------------
       - name: Checkout Code
         uses: actions/checkout@v5
 
-      - name: Install AWS CLI
+      # --------------------------------------------------------
+      # Verify AWS CLI
+      # --------------------------------------------------------
+      # AWS CLI is already installed on the self-hosted runner.
+      # Do NOT reinstall it every pipeline run.
+      # --------------------------------------------------------
+      - name: Verify AWS CLI
         run: |
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          sudo ./aws/install
+          which aws
+          aws --version
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+      # --------------------------------------------------------
+      # Configure AWS Credentials
+      # --------------------------------------------------------
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
+      # --------------------------------------------------------
+      # Verify AWS Authentication
+      # --------------------------------------------------------
+      - name: Verify AWS Identity
+        run: |
+          aws sts get-caller-identity
+
+      # --------------------------------------------------------
+      # Set up kubectl
+      # --------------------------------------------------------
       - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
+        uses: azure/setup-kubectl@v4
         with:
           version: latest
 
+      # --------------------------------------------------------
+      # Configure kubeconfig
+      # --------------------------------------------------------
       - name: Configure kubeconfig
         run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.EKS_KUBECONFIG }}" > $HOME/.kube/config
+          mkdir -p "$HOME/.kube"
+          chmod 700 "$HOME/.kube"
 
+          echo "${{ secrets.EKS_KUBECONFIG }}" > "$HOME/.kube/config"
+
+          chmod 600 "$HOME/.kube/config"
+
+      # --------------------------------------------------------
+      # Verify Kubernetes Connection
+      # --------------------------------------------------------
+      - name: Verify Kubernetes Connection
+        run: |
+          kubectl version --client
+          kubectl get nodes
+          kubectl get pods -A
+
+      # --------------------------------------------------------
+      # Deploy Application
+      # --------------------------------------------------------
       - name: Deploy to EKS
         run: |
           kubectl apply -f ds.yml
+
+      # --------------------------------------------------------
+      # Verify Deployment
+      # --------------------------------------------------------
+      - name: Verify Deployment
+        run: |
+          kubectl get pods
+          kubectl get svc
+
+      # --------------------------------------------------------
+      # Wait for Rollout
+      # --------------------------------------------------------
+      - name: Wait for Rollout
+        run: |
+          kubectl rollout status deployment/bankapp --timeout=180s
